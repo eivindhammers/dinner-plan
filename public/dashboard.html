@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Dinner Plan</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 {
+            color: #333;
+            font-size: 1.8em;
+        }
+        
+        .logout-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.3s;
+        }
+        
+        .logout-btn:hover {
+            background: #d32f2f;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+        
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        
+        .submit-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            width: 100%;
+            transition: background 0.3s;
+        }
+        
+        .submit-btn:hover {
+            background: #5568d3;
+        }
+        
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .dinner-list {
+            height: 400px;
+            overflow-y: auto;
+        }
+        
+        .dinner-item {
+            background: #f9f9f9;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .dinner-item h3 {
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+        
+        .dinner-item p {
+            color: #666;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+        
+        .dinner-item a {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.9em;
+        }
+        
+        .dinner-item a:hover {
+            text-decoration: underline;
+        }
+        
+        .message {
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🍽️ Dinner Plan Dashboard</h1>
+        <a href="/logout" class="logout-btn">Logout</a>
+    </div>
+    
+    <div class="container">
+        <div class="card">
+            <h2>Create Dinner Plan</h2>
+            <div id="message" class="message"></div>
+            <form id="dinnerForm">
+                <div class="form-group">
+                    <label for="title">Dinner Title *</label>
+                    <input type="text" id="title" name="title" required placeholder="e.g., Family Dinner, Date Night">
+                </div>
+                
+                <div class="form-group">
+                    <label for="date">Date *</label>
+                    <input type="date" id="date" name="date" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="time">Time *</label>
+                    <input type="time" id="time" name="time" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="location">Location</label>
+                    <input type="text" id="location" name="location" placeholder="e.g., Home, Restaurant Name">
+                </div>
+                
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea id="description" name="description" placeholder="Additional details..."></textarea>
+                </div>
+                
+                <button type="submit" class="submit-btn" id="submitBtn">Add to Calendar</button>
+            </form>
+        </div>
+        
+        <div class="card">
+            <h2>Upcoming Dinner Plans</h2>
+            <div id="dinnerList" class="dinner-list">
+                <div class="loading">Loading dinner plans...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Set minimum date to today
+        document.getElementById('date').min = new Date().toISOString().split('T')[0];
+        
+        // Load dinner plans
+        async function loadDinnerPlans() {
+            const dinnerList = document.getElementById('dinnerList');
+            
+            try {
+                const response = await fetch('/api/dinner-plans');
+                const data = await response.json();
+                
+                if (data.dinnerPlans && data.dinnerPlans.length > 0) {
+                    dinnerList.innerHTML = data.dinnerPlans.map(plan => {
+                        const startDate = new Date(plan.start);
+                        const formattedDate = startDate.toLocaleDateString();
+                        const formattedTime = startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        
+                        return `
+                            <div class="dinner-item">
+                                <h3>${plan.title}</h3>
+                                <p><strong>📅 ${formattedDate}</strong> at <strong>🕐 ${formattedTime}</strong></p>
+                                ${plan.location ? `<p>📍 ${plan.location}</p>` : ''}
+                                ${plan.description ? `<p>${plan.description}</p>` : ''}
+                                <a href="${plan.link}" target="_blank">View in Google Calendar →</a>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    dinnerList.innerHTML = '<div class="empty-state">No upcoming dinner plans. Create one to get started!</div>';
+                }
+            } catch (error) {
+                console.error('Error loading dinner plans:', error);
+                dinnerList.innerHTML = '<div class="empty-state">Failed to load dinner plans.</div>';
+            }
+        }
+        
+        // Show message
+        function showMessage(text, type) {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = text;
+            messageEl.className = `message ${type}`;
+            messageEl.style.display = 'block';
+            
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 5000);
+        }
+        
+        // Handle form submission
+        document.getElementById('dinnerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Adding to Calendar...';
+            
+            const formData = {
+                title: document.getElementById('title').value,
+                date: document.getElementById('date').value,
+                time: document.getElementById('time').value,
+                location: document.getElementById('location').value,
+                description: document.getElementById('description').value
+            };
+            
+            try {
+                const response = await fetch('/api/dinner-plan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage('Dinner plan added to Google Calendar successfully!', 'success');
+                    document.getElementById('dinnerForm').reset();
+                    document.getElementById('date').min = new Date().toISOString().split('T')[0];
+                    loadDinnerPlans(); // Refresh the list
+                } else {
+                    showMessage(`Error: ${data.error || 'Failed to add dinner plan'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('Failed to add dinner plan. Please try again.', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Add to Calendar';
+            }
+        });
+        
+        // Load dinner plans on page load
+        loadDinnerPlans();
+    </script>
+</body>
+</html>
