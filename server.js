@@ -44,6 +44,14 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Rate limiting for general routes
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200, // Limit each IP to 200 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Google OAuth2 client setup
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
@@ -55,7 +63,7 @@ const oauth2Client = new google.auth.OAuth2(
 const SCOPES = ['https://www.googleapis.com/auth/calendar.events'];
 
 // Routes
-app.get('/', (req, res) => {
+app.get('/', generalLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
@@ -93,7 +101,7 @@ app.get('/oauth2callback', authLimiter, async (req, res) => {
 });
 
 // Dashboard page
-app.get('/dashboard', (req, res) => {
+app.get('/dashboard', generalLimiter, (req, res) => {
   if (!req.session.authenticated) {
     return res.redirect('/');
   }
