@@ -243,8 +243,13 @@
     </div>
     
     <script>
+        // Helper function to set minimum date
+        function setMinimumDate() {
+            document.getElementById('date').min = new Date().toISOString().split('T')[0];
+        }
+        
         // Set minimum date to today
-        document.getElementById('date').min = new Date().toISOString().split('T')[0];
+        setMinimumDate();
         
         // Load dinner plans
         async function loadDinnerPlans() {
@@ -321,7 +326,7 @@
                 if (response.ok) {
                     showMessage('Dinner plan added to Google Calendar successfully!', 'success');
                     document.getElementById('dinnerForm').reset();
-                    document.getElementById('date').min = new Date().toISOString().split('T')[0];
+                    setMinimumDate();
                     loadDinnerPlans(); // Refresh the list
                 } else {
                     showMessage(`Error: ${data.error || 'Failed to add dinner plan'}`, 'error');

@@ -7,6 +7,9 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Constants
+const DINNER_DURATION_HOURS = 2;
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -94,7 +97,7 @@ app.post('/api/dinner-plan', async (req, res) => {
 
     // Parse date and time
     const startDateTime = new Date(`${date}T${time}`);
-    const endDateTime = new Date(startDateTime.getTime() + 2 * 60 * 60 * 1000); // 2 hours duration
+    const endDateTime = new Date(startDateTime.getTime() + DINNER_DURATION_HOURS * 60 * 60 * 1000);
 
     const event = {
       summary: `Dinner: ${title}`,
@@ -102,11 +105,11 @@ app.post('/api/dinner-plan', async (req, res) => {
       location: location || '',
       start: {
         dateTime: startDateTime.toISOString(),
-        timeZone: 'UTC',
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
       end: {
         dateTime: endDateTime.toISOString(),
-        timeZone: 'UTC',
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
       reminders: {
         useDefault: false,
@@ -179,8 +182,12 @@ app.get('/api/dinner-plans', async (req, res) => {
 
 // Logout
 app.get('/logout', (req, res) => {
-  req.session.destroy();
-  res.redirect('/');
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Error destroying session:', err);
+    }
+    res.redirect('/');
+  });
 });
 
 // Check authentication status
