@@ -22,7 +22,7 @@ app.use(session({
   cookie: { 
     secure: process.env.NODE_ENV === 'production', // Only send cookie over HTTPS in production
     httpOnly: true, // Prevent XSS attacks
-    sameSite: 'lax' // CSRF protection
+    sameSite: 'lax' // CSRF protection - prevents cookie from being sent in cross-site POST requests
   }
 }));
 
