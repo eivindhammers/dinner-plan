@@ -1,5 +1,6 @@
 const express = require('express');
 const session = require('express-session');
+const rateLimit = require('express-rate-limit');
 const { google } = require('googleapis');
 const path = require('path');
 require('dotenv').config();
@@ -18,8 +19,30 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'dinner-plan-secret-key',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false } // Set to true in production with HTTPS
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production', // Only send cookie over HTTPS in production
+    httpOnly: true, // Prevent XSS attacks
+    sameSite: 'lax' // CSRF protection
+  }
 }));
+
+// Rate limiting for authentication routes
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Limit each IP to 10 requests per windowMs
+  message: 'Too many authentication attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limiting for API routes
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Google OAuth2 client setup
 const oauth2Client = new google.auth.OAuth2(
@@ -37,7 +60,7 @@ app.get('/', (req, res) => {
 });
 
 // Initiate OAuth flow
-app.get('/auth/google', (req, res) => {
+app.get('/auth/google', authLimiter, (req, res) => {
   const authUrl = oauth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
@@ -47,7 +70,7 @@ app.get('/auth/google', (req, res) => {
 });
 
 // OAuth callback
-app.get('/oauth2callback', async (req, res) => {
+app.get('/oauth2callback', authLimiter, async (req, res) => {
   const { code } = req.query;
   
   if (!code) {
@@ -78,7 +101,7 @@ app.get('/dashboard', (req, res) => {
 });
 
 // Create dinner plan and add to Google Calendar
-app.post('/api/dinner-plan', async (req, res) => {
+app.post('/api/dinner-plan', apiLimiter, async (req, res) => {
   if (!req.session.authenticated || !req.session.tokens) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
@@ -141,7 +164,7 @@ app.post('/api/dinner-plan', async (req, res) => {
 });
 
 // Get upcoming dinner plans from Google Calendar
-app.get('/api/dinner-plans', async (req, res) => {
+app.get('/api/dinner-plans', apiLimiter, async (req, res) => {
   if (!req.session.authenticated || !req.session.tokens) {
     return res.status(401).json({ error: 'Not authenticated' });
   }

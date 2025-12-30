@@ -57,7 +57,10 @@ GOOGLE_CLIENT_SECRET=your_client_secret_here
 GOOGLE_REDIRECT_URI=http://localhost:3000/oauth2callback
 SESSION_SECRET=your_random_session_secret_here
 PORT=3000
+NODE_ENV=development
 ```
+
+Note: Set `NODE_ENV=production` in production to enable secure cookies over HTTPS.
 
 ## Usage
 
@@ -85,8 +88,12 @@ npm start
 ## Security Notes
 
 - Never commit your `.env` file to version control
-- Use HTTPS in production
-- Set `cookie: { secure: true }` in session configuration when using HTTPS
+- Use HTTPS in production by setting `NODE_ENV=production`
+- Secure cookies are automatically enabled in production mode
+- Rate limiting is applied to prevent abuse:
+  - Authentication routes: 10 requests per 15 minutes per IP
+  - API routes: 100 requests per 15 minutes per IP
+- Session cookies use `httpOnly` and `sameSite` flags for XSS and CSRF protection
 - Regularly rotate your session secret
 
 ## Development
