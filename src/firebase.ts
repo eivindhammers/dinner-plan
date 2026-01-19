@@ -10,5 +10,17 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 }
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig)
+
+// Initialize Firestore
 export const db = getFirestore(app)
+
+// Check if Firebase is configured
+export const isFirebaseConfigured = (): boolean => {
+  return !!(
+    firebaseConfig.apiKey &&
+    firebaseConfig.projectId &&
+    firebaseConfig.appId
+  )
+}
