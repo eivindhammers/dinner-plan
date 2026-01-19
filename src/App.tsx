@@ -336,18 +336,33 @@ function App() {
 
   // Subscribe to Firestore meals
   useEffect(() => {
-    if (!useFirestore) return
+    if (!useFirestore) {
+      return
+    }
+
+    let hasInitialized = false
 
     const unsubscribe = subscribeToMeals(
-      (firestoreMeals) => {
-        // If Firestore has data, use it; otherwise use default meals
+      async (firestoreMeals) => {
+        // If Firestore has data, use it
         if (firestoreMeals.length > 0) {
           setMeals(firestoreMeals)
-        } else {
-          // Initialize with default meals if Firestore is empty
+          setIsLoading(false)
+        } else if (!hasInitialized) {
+          // Initialize with default meals if Firestore is empty (new user, first time)
+          hasInitialized = true
           setMeals(DEFAULT_MEALS)
+          setIsLoading(false)
+          
+          // Add default meals to Firestore for new users (in background)
+          try {
+            for (const meal of DEFAULT_MEALS) {
+              await addMealToFirestore(meal)
+            }
+          } catch (error) {
+            console.error('Error adding default meals:', error)
+          }
         }
-        setIsLoading(false)
       },
       (error) => {
         console.error('Firestore meals error:', error)
