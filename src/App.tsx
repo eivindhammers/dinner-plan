@@ -1,26 +1,21 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import './App.css'
-
-type Meal = {
-  id: string
-  title: string
-  ingredients: string
-  imageUrl?: string
-  steps?: string
-}
-
-type Day =
-  | 'Mandag'
-  | 'Tirsdag'
-  | 'Onsdag'
-  | 'Torsdag'
-  | 'Fredag'
-  | 'Lørdag'
-  | 'Søndag'
-
-type WeekPlan = Record<Day, string[]>
-
-type WeeklyPlans = Record<string, WeekPlan>
+import { MigrationModal } from './MigrationModal'
+import {
+  type Meal,
+  type Day,
+  type WeekPlan,
+  type WeeklyPlans,
+  subscribeToMeals,
+  subscribeToWeeklyPlans,
+  addMealToFirestore,
+  updateMealInFirestore,
+  deleteMealFromFirestore,
+  updateWeeklyPlanInFirestore,
+  migrateToFirestore,
+  checkFirestoreHasData,
+} from './firestoreUtils'
+import { isFirebaseConfigured } from './firebase'
 
 const DAYS: Day[] = [
   'Mandag',
@@ -84,6 +79,7 @@ const LEGACY_PLAN_KEY = 'dinner-plan:weekly-plan'
 const LEGACY_WEEK_START_KEY = 'dinner-plan:week-start'
 const WEEKLY_PLANS_KEY = 'dinner-plan:weekly-plans'
 const AUTH_KEY = 'dinner-plan:auth'
+const MIGRATION_DONE_KEY = 'dinner-plan:migration-done'
 const APP_PASSWORD = import.meta.env.VITE_APP_PASSWORD ?? 'familie'
 
 const pad = (n: number) => n.toString().padStart(2, '0')
@@ -302,14 +298,110 @@ function App() {
   )
   const [passwordInput, setPasswordInput] = useState('')
   const [authError, setAuthError] = useState('')
+  const [showMigrationModal, setShowMigrationModal] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [firestoreError, setFirestoreError] = useState<string | null>(null)
+  const [useFirestore, setUseFirestore] = useState(isFirebaseConfigured())
+  const [creatingWeeks, setCreatingWeeks] = useState<Set<string>>(new Set())
 
+  // Check if migration is needed on mount
   useEffect(() => {
+    const checkMigration = async () => {
+      if (!isFirebaseConfigured()) {
+        setUseFirestore(false)
+        setIsLoading(false)
+        return
+      }
+
+      const migrationDone = localStorage.getItem(MIGRATION_DONE_KEY) === 'true'
+      const hasFirestoreData = await checkFirestoreHasData()
+
+      // Show migration modal if:
+      // 1. Migration not done yet
+      // 2. Firestore doesn't have data
+      // 3. localStorage has data
+      const localMeals = loadMeals()
+      const localPlans = loadWeeklyPlans()
+      const hasLocalData =
+        localMeals.length > 0 || Object.keys(localPlans).length > 0
+
+      if (!migrationDone && !hasFirestoreData && hasLocalData) {
+        setShowMigrationModal(true)
+      }
+
+      setIsLoading(false)
+    }
+
+    checkMigration()
+  }, [])
+
+  // Subscribe to Firestore meals
+  useEffect(() => {
+    if (!useFirestore) {
+      return
+    }
+
+    let hasInitialized = false
+
+    const unsubscribe = subscribeToMeals(
+      async (firestoreMeals) => {
+        // If Firestore has data, use it
+        if (firestoreMeals.length > 0) {
+          setMeals(firestoreMeals)
+          setIsLoading(false)
+        } else if (!hasInitialized) {
+          // Initialize with default meals if Firestore is empty (new user, first time)
+          hasInitialized = true
+          setMeals(DEFAULT_MEALS)
+          setIsLoading(false)
+
+          // Add default meals to Firestore for new users (in background)
+          try {
+            for (const meal of DEFAULT_MEALS) {
+              await addMealToFirestore(meal)
+            }
+          } catch (error) {
+            console.error('Error adding default meals:', error)
+          }
+        }
+      },
+      (error) => {
+        console.error('Firestore meals error:', error)
+        setFirestoreError('Kunne ikke laste retter fra Firebase')
+        setIsLoading(false)
+      },
+    )
+
+    return () => unsubscribe()
+  }, [useFirestore])
+
+  // Subscribe to Firestore weekly plans
+  useEffect(() => {
+    if (!useFirestore) return
+
+    const unsubscribe = subscribeToWeeklyPlans(
+      (firestorePlans) => {
+        setWeeklyPlans(firestorePlans)
+      },
+      (error) => {
+        console.error('Firestore plans error:', error)
+        setFirestoreError('Kunne ikke laste ukeplaner fra Firebase')
+      },
+    )
+
+    return () => unsubscribe()
+  }, [useFirestore])
+
+  // Fallback to localStorage if not using Firestore
+  useEffect(() => {
+    if (useFirestore) return
     localStorage.setItem(MEAL_STORAGE_KEY, JSON.stringify(meals))
-  }, [meals])
+  }, [meals, useFirestore])
 
   useEffect(() => {
+    if (useFirestore) return
     localStorage.setItem(WEEKLY_PLANS_KEY, JSON.stringify(weeklyPlans))
-  }, [weeklyPlans])
+  }, [weeklyPlans, useFirestore])
 
   useEffect(() => {
     localStorage.setItem(LEGACY_WEEK_START_KEY, currentWeekStart)
@@ -324,6 +416,22 @@ function App() {
     } else {
       setAuthError('Feil passord. Prøv igjen.')
     }
+  }
+
+  const handleMigration = async (
+    mealsToMigrate: Meal[],
+    plansToMigrate: WeeklyPlans,
+    onProgress: (status: string) => void,
+  ) => {
+    await migrateToFirestore(mealsToMigrate, plansToMigrate, onProgress)
+    localStorage.setItem(MIGRATION_DONE_KEY, 'true')
+    setShowMigrationModal(false)
+  }
+
+  const dismissMigrationModal = () => {
+    // User chose not to migrate, mark as done so modal doesn't show again
+    localStorage.setItem(MIGRATION_DONE_KEY, 'true')
+    setShowMigrationModal(false)
   }
 
   const currentPlan = useMemo(
@@ -367,48 +475,74 @@ function App() {
 
   const weekList = useMemo(() => Object.keys(weeklyPlans).sort(), [weeklyPlans])
 
-  const ensureWeekExists = (weekStart: string) => {
-    setWeeklyPlans((prev) => {
-      const monday = toMonday(weekStart)
-      if (prev[monday]) return prev
-      return {
-        ...prev,
-        [monday]: emptyPlan(),
+  const ensureWeekExists = async (weekStart: string) => {
+    const monday = toMonday(weekStart)
+    if (weeklyPlans[monday] || creatingWeeks.has(monday)) return
+
+    // Mark week as being created to prevent race conditions
+    setCreatingWeeks((prev) => new Set(prev).add(monday))
+
+    const newPlan = emptyPlan()
+
+    try {
+      if (useFirestore) {
+        await updateWeeklyPlanInFirestore(monday, newPlan)
+      } else {
+        // Fallback to localStorage
+        setWeeklyPlans((prev) => ({
+          ...prev,
+          [monday]: newPlan,
+        }))
       }
-    })
+    } catch (error) {
+      console.error('Error creating week:', error)
+      setFirestoreError('Kunne ikke opprette uke')
+    } finally {
+      // Remove from creating set
+      setCreatingWeeks((prev) => {
+        const next = new Set(prev)
+        next.delete(monday)
+        return next
+      })
+    }
   }
 
-  const onSubmit = (event: FormEvent) => {
+  const onSubmit = async (event: FormEvent) => {
     event.preventDefault()
     if (!formState.title.trim()) return
 
-    if (editingMealId) {
-      setMeals((prev) =>
-        prev.map((meal) =>
-          meal.id === editingMealId
-            ? {
-                ...meal,
-                title: formState.title.trim(),
-                ingredients: formState.ingredients.trim(),
-                steps: formState.steps.trim() || undefined,
-                imageUrl: formState.imageUrl.trim() || undefined,
-              }
-            : meal,
-        ),
-      )
-      setEditingMealId(null)
-    } else {
-      const newMeal: Meal = {
-        id: makeId(),
-        title: formState.title.trim(),
-        ingredients: formState.ingredients.trim(),
-        steps: formState.steps.trim() || undefined,
-        imageUrl: formState.imageUrl.trim() || undefined,
-      }
-      setMeals((prev) => [...prev, newMeal])
+    const mealData: Meal = {
+      id: editingMealId || makeId(),
+      title: formState.title.trim(),
+      ingredients: formState.ingredients.trim(),
+      steps: formState.steps.trim() || undefined,
+      imageUrl: formState.imageUrl.trim() || undefined,
     }
 
-    setFormState({ title: '', ingredients: '', steps: '', imageUrl: '' })
+    try {
+      if (useFirestore) {
+        if (editingMealId) {
+          await updateMealInFirestore(mealData)
+        } else {
+          await addMealToFirestore(mealData)
+        }
+      } else {
+        // Fallback to localStorage
+        if (editingMealId) {
+          setMeals((prev) =>
+            prev.map((meal) => (meal.id === editingMealId ? mealData : meal)),
+          )
+        } else {
+          setMeals((prev) => [...prev, mealData])
+        }
+      }
+
+      setEditingMealId(null)
+      setFormState({ title: '', ingredients: '', steps: '', imageUrl: '' })
+    } catch (error) {
+      console.error('Error saving meal:', error)
+      setFirestoreError('Kunne ikke lagre rett')
+    }
   }
 
   const startEdit = (meal: Meal) => {
@@ -427,51 +561,96 @@ function App() {
     setFormState({ title: '', ingredients: '', steps: '', imageUrl: '' })
   }
 
-  const deleteMeal = (id: string) => {
-    setMeals((prev) => prev.filter((meal) => meal.id !== id))
-    setWeeklyPlans((prev) => {
-      const next: WeeklyPlans = {}
-      Object.entries(prev).forEach(([week, plan]) => {
-        const updated = emptyPlan()
-        DAYS.forEach((day) => {
-          updated[day] = plan[day].filter((mealId) => mealId !== id)
+  const deleteMeal = async (id: string) => {
+    try {
+      if (useFirestore) {
+        await deleteMealFromFirestore(id)
+        // Also update weekly plans to remove the meal
+        const updatedPlans: WeeklyPlans = {}
+        Object.entries(weeklyPlans).forEach(([week, plan]) => {
+          const updated = emptyPlan()
+          DAYS.forEach((day) => {
+            updated[day] = plan[day].filter((mealId) => mealId !== id)
+          })
+          updatedPlans[week] = updated
         })
-        next[week] = updated
-      })
-      return next
-    })
+        // Update all affected plans in Firestore
+        for (const [week, plan] of Object.entries(updatedPlans)) {
+          if (JSON.stringify(plan) !== JSON.stringify(weeklyPlans[week])) {
+            await updateWeeklyPlanInFirestore(week, plan)
+          }
+        }
+      } else {
+        // Fallback to localStorage
+        setMeals((prev) => prev.filter((meal) => meal.id !== id))
+        setWeeklyPlans((prev) => {
+          const next: WeeklyPlans = {}
+          Object.entries(prev).forEach(([week, plan]) => {
+            const updated = emptyPlan()
+            DAYS.forEach((day) => {
+              updated[day] = plan[day].filter((mealId) => mealId !== id)
+            })
+            next[week] = updated
+          })
+          return next
+        })
+      }
+    } catch (error) {
+      console.error('Error deleting meal:', error)
+      setFirestoreError('Kunne ikke slette rett')
+    }
   }
 
-  const addMealToDay = (day: Day, mealId: string) => {
+  const addMealToDay = async (day: Day, mealId: string) => {
     if (!mealId) return
-    setWeeklyPlans((prev) => {
-      const plan = prev[currentWeekStart] ?? emptyPlan()
-      return {
-        ...prev,
-        [currentWeekStart]: {
-          ...plan,
-          [day]: [...plan[day], mealId],
-        },
+
+    const newPlan: WeekPlan = {
+      ...(weeklyPlans[currentWeekStart] ?? emptyPlan()),
+      [day]: [...(weeklyPlans[currentWeekStart]?.[day] ?? []), mealId],
+    }
+
+    try {
+      if (useFirestore) {
+        await updateWeeklyPlanInFirestore(currentWeekStart, newPlan)
+      } else {
+        // Fallback to localStorage
+        setWeeklyPlans((prev) => ({
+          ...prev,
+          [currentWeekStart]: newPlan,
+        }))
       }
-    })
-    setDayInputs((prev) => ({ ...prev, [day]: '' }))
+      setDayInputs((prev) => ({ ...prev, [day]: '' }))
+    } catch (error) {
+      console.error('Error adding meal to day:', error)
+      setFirestoreError('Kunne ikke legge til rett i planen')
+    }
   }
 
   const toggleDetails = (id: string) => {
     setOpenDetails((prev) => ({ ...prev, [id]: !prev[id] }))
   }
 
-  const removeFromPlan = (day: Day, index: number) => {
-    setWeeklyPlans((prev) => {
-      const plan = prev[currentWeekStart] ?? emptyPlan()
-      return {
-        ...prev,
-        [currentWeekStart]: {
-          ...plan,
-          [day]: plan[day].filter((_, i) => i !== index),
-        },
+  const removeFromPlan = async (day: Day, index: number) => {
+    const plan = weeklyPlans[currentWeekStart] ?? emptyPlan()
+    const newPlan: WeekPlan = {
+      ...plan,
+      [day]: plan[day].filter((_, i) => i !== index),
+    }
+
+    try {
+      if (useFirestore) {
+        await updateWeeklyPlanInFirestore(currentWeekStart, newPlan)
+      } else {
+        // Fallback to localStorage
+        setWeeklyPlans((prev) => ({
+          ...prev,
+          [currentWeekStart]: newPlan,
+        }))
       }
-    })
+    } catch (error) {
+      console.error('Error removing meal from plan:', error)
+      setFirestoreError('Kunne ikke fjerne rett fra planen')
+    }
   }
 
   const handleDownloadIcs = () => {
@@ -566,8 +745,45 @@ function App() {
     )
   }
 
+  if (isLoading) {
+    return (
+      <div className="auth-shell">
+        <div className="auth-card">
+          <h1>Laster...</h1>
+          <p className="hint">Henter data fra Firebase...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="app-shell">
+    <>
+      {showMigrationModal && (
+        <MigrationModal
+          meals={loadMeals()}
+          weeklyPlans={loadWeeklyPlans()}
+          onMigrate={handleMigration}
+          onDismiss={dismissMigrationModal}
+        />
+      )}
+      {firestoreError && (
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <h2>⚠️ Feil</h2>
+            <p>{firestoreError}</p>
+            <div className="actions">
+              <button
+                type="button"
+                className="primary"
+                onClick={() => setFirestoreError(null)}
+              >
+                Lukk
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="app-shell">
       <header className="hero">
         <div>
           <p className="eyebrow">Middag</p>
@@ -892,6 +1108,7 @@ function App() {
         )}
       </section>
     </div>
+    </>
   )
 }
 
