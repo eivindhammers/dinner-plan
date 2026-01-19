@@ -302,6 +302,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true)
   const [firestoreError, setFirestoreError] = useState<string | null>(null)
   const [useFirestore, setUseFirestore] = useState(isFirebaseConfigured())
+  const [creatingWeeks, setCreatingWeeks] = useState<Set<string>>(new Set())
 
   // Check if migration is needed on mount
   useEffect(() => {
@@ -353,7 +354,7 @@ function App() {
           hasInitialized = true
           setMeals(DEFAULT_MEALS)
           setIsLoading(false)
-          
+
           // Add default meals to Firestore for new users (in background)
           try {
             for (const meal of DEFAULT_MEALS) {
@@ -476,7 +477,10 @@ function App() {
 
   const ensureWeekExists = async (weekStart: string) => {
     const monday = toMonday(weekStart)
-    if (weeklyPlans[monday]) return
+    if (weeklyPlans[monday] || creatingWeeks.has(monday)) return
+
+    // Mark week as being created to prevent race conditions
+    setCreatingWeeks((prev) => new Set(prev).add(monday))
 
     const newPlan = emptyPlan()
 
@@ -493,6 +497,13 @@ function App() {
     } catch (error) {
       console.error('Error creating week:', error)
       setFirestoreError('Kunne ikke opprette uke')
+    } finally {
+      // Remove from creating set
+      setCreatingWeeks((prev) => {
+        const next = new Set(prev)
+        next.delete(monday)
+        return next
+      })
     }
   }
 

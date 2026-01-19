@@ -65,7 +65,7 @@ export const subscribeToMeals = (
   )
 }
 
-export const addMealToFirestore = async (meal: Meal): Promise<void> => {
+export const saveMealToFirestore = async (meal: Meal): Promise<void> => {
   if (!isFirebaseConfigured()) {
     throw new Error('Firebase not configured')
   }
@@ -78,18 +78,8 @@ export const addMealToFirestore = async (meal: Meal): Promise<void> => {
   })
 }
 
-export const updateMealInFirestore = async (meal: Meal): Promise<void> => {
-  if (!isFirebaseConfigured()) {
-    throw new Error('Firebase not configured')
-  }
-  const mealRef = doc(db, MEALS_COLLECTION, meal.id)
-  await setDoc(mealRef, {
-    title: meal.title,
-    ingredients: meal.ingredients,
-    imageUrl: meal.imageUrl,
-    steps: meal.steps,
-  })
-}
+export const addMealToFirestore = saveMealToFirestore
+export const updateMealInFirestore = saveMealToFirestore
 
 export const deleteMealFromFirestore = async (id: string): Promise<void> => {
   if (!isFirebaseConfigured()) {
