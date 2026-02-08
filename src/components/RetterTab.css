@@ -8,20 +8,18 @@
 .add-meal-btn {
   padding: 8px 16px;
   border-radius: 10px;
-  border: 2px dashed #d1d5db;
-  background: #f9fafb;
+  border: none;
+  background: linear-gradient(120deg, #2563eb, #3b82f6);
   font-size: 14px;
   font-weight: 600;
-  color: #6b7280;
+  color: #fff;
   cursor: pointer;
-  transition: border-color 150ms, color 150ms, background 150ms;
+  transition: opacity 150ms;
   white-space: nowrap;
 }
 
 .add-meal-btn:hover {
-  border-color: #3b82f6;
-  color: #2563eb;
-  background: #eff6ff;
+  opacity: 0.9;
   transform: none;
   box-shadow: none;
 }
