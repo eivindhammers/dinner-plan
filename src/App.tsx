@@ -16,6 +16,10 @@ import {
   checkFirestoreHasData,
 } from './firestoreUtils'
 import { isFirebaseConfigured } from './firebase'
+import { TabBar, type TabId } from './components/TabBar'
+import { UkeplanTab } from './components/UkeplanTab'
+import { RetterTab } from './components/RetterTab'
+import { HistorikkTab } from './components/HistorikkTab'
 
 const DAYS: Day[] = [
   'Mandag',
@@ -303,6 +307,7 @@ function App() {
   const [firestoreError, setFirestoreError] = useState<string | null>(null)
   const [useFirestore, setUseFirestore] = useState(isFirebaseConfigured())
   const [creatingWeeks, setCreatingWeeks] = useState<Set<string>>(new Set())
+  const [activeTab, setActiveTab] = useState<TabId>('ukeplan')
 
   // Check if migration is needed on mount
   useEffect(() => {
@@ -688,32 +693,12 @@ function App() {
     setCurrentWeekStart(monday)
   }
 
-  const renderSuggestions = (day: Day) => {
-    const query = dayInputs[day].toLowerCase()
-    if (!query) return null
-    const matches = meals
-      .filter((meal) => meal.title.toLowerCase().includes(query))
-      .slice(0, 5)
-    if (matches.length === 0) {
-      return <p className="hint small">Ingen treff.</p>
-    }
-    return (
-      <div className="suggestions">
-        {matches.map((meal) => (
-          <button
-            type="button"
-            key={meal.id}
-            className="suggestion"
-            onClick={() => addMealToDay(day, meal.id)}
-          >
-            <span>{meal.title}</span>
-            <span className="hint small">
-              {(meal.ingredients.split('\n').filter(Boolean)[0] ?? '').slice(0, 50)}
-            </span>
-          </button>
-        ))}
-      </div>
-    )
+  const handleFormChange = (field: string, value: string) => {
+    setFormState((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleDayInputChange = (day: Day, value: string) => {
+    setDayInputs((prev) => ({ ...prev, [day]: value }))
   }
 
   if (!authorized) {
@@ -784,329 +769,56 @@ function App() {
         </div>
       )}
       <div className="app-shell">
-      <header className="hero">
-        <div>
-          <p className="eyebrow">Middag</p>
-          <h1>Planlegg ukeplanen med favorittrettene dine</h1>
-          <p className="lede">
-            Lagre rettene dine, legg dem til mandag–søndag med autosøk, og eksporter til kalenderen
-            din som heldags hendelser.
-          </p>
-        </div>
-        <div className="export">
-          <label className="field">
-            <span>Uke som vises</span>
-            <input
-              type="date"
-              value={currentWeekStart}
-              onChange={(event) => handleWeekChange(event.target.value || getUpcomingMonday())}
-              step={7}
-            />
-          </label>
-          <div className="week-switcher">
-            <button type="button" onClick={() => navigateWeek(-1)}>
-              ← Forrige uke
-            </button>
-            <button type="button" onClick={() => navigateWeek(1)}>
-              Neste uke →
-            </button>
-          </div>
-          <button
-            className="primary"
-            onClick={handleDownloadIcs}
-            disabled={!planHasEntries || !currentWeekStart}
-          >
-            Eksporter .ics
-          </button>
-          {!planHasEntries && <p className="hint">Legg til retter i planen for å eksportere.</p>}
-        </div>
+      <header className="app-header">
+        <h1>Middagsplanlegger</h1>
       </header>
 
-      <div className="grid">
-        <section className="card">
-          <div className="section-header">
-            <div>
-              <p className="eyebrow">Middagsportefølje</p>
-              <h2>{editingMealId ? 'Rediger rett' : 'Legg til en rett'}</h2>
-            </div>
-          </div>
-          <form className="form" onSubmit={onSubmit}>
-            <label className="field">
-              <span>Navn på rett</span>
-              <input
-                required
-                value={formState.title}
-                onChange={(event) =>
-                  setFormState((prev) => ({ ...prev, title: event.target.value }))
-                }
-                placeholder="F.eks. Laks med sitron og urter"
-              />
-            </label>
-            <label className="field">
-              <span>Ingredienser (én per linje)</span>
-              <textarea
-                value={formState.ingredients}
-                onChange={(event) =>
-                  setFormState((prev) => ({ ...prev, ingredients: event.target.value }))
-                }
-                placeholder={'Laks\nSitron\nHvitløk\nOlivenolje'}
-                rows={5}
-              />
-            </label>
-            <label className="field">
-              <span>Fremgangsmåte (én per linje)</span>
-              <textarea
-                value={formState.steps}
-                onChange={(event) =>
-                  setFormState((prev) => ({ ...prev, steps: event.target.value }))
-                }
-                placeholder={'Skjær laksen i terninger\nFres currypaste i olje\nKok opp med kokosmelk'}
-                rows={5}
-              />
-            </label>
-            <label className="field">
-              <span>Bilde-URL (valgfritt)</span>
-              <input
-                value={formState.imageUrl}
-                onChange={(event) =>
-                  setFormState((prev) => ({ ...prev, imageUrl: event.target.value }))
-                }
-                placeholder="https://ditt-bilde.no/rett.jpg"
-              />
-            </label>
-            <p className="hint small">Bilder er valgfrie. Bruk nettadresser du stoler på.</p>
-            <div className="actions">
-              {editingMealId && (
-                <button type="button" onClick={cancelEdit}>
-                  Avbryt
-                </button>
-              )}
-              <button type="submit" className="primary">
-                {editingMealId ? 'Lagre endringer' : 'Lagre rett'}
-              </button>
-            </div>
-          </form>
-        </section>
+      <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
-        <section className="card">
-          <div className="section-header">
-            <div>
-              <p className="eyebrow">Middagsportefølje</p>
-              <h2>Bibliotek</h2>
-            </div>
-            <p className="hint">Hold oversikt over rettene du liker å lage.</p>
-          </div>
-          <label className="field">
-            <span>Søk i retter</span>
-            <input
-              value={mealFilter}
-              onChange={(event) => setMealFilter(event.target.value)}
-              placeholder="Søk etter navn eller ingrediens"
-            />
-          </label>
-          <p className="hint small">
-            Viser {filteredMeals.length} av {meals.length} retter
-          </p>
-          {meals.length === 0 ? (
-            <p className="empty">Ingen lagrede retter ennå.</p>
-          ) : (
-            <div className="meal-grid">
-              {filteredMeals.map((meal) => {
-                const ingredients = meal.ingredients
-                  .split('\n')
-                  .map((item) => item.trim())
-                  .filter(Boolean)
-                const isOpen = openDetails[meal.id] ?? false
-                return (
-                  <article className="meal-card" key={meal.id}>
-                    <div className="thumb">
-                      {meal.imageUrl ? (
-                        <img src={meal.imageUrl} alt="" loading="lazy" />
-                      ) : (
-                        <div className="placeholder" aria-hidden />
-                      )}
-                    </div>
-                    <div className="meal-body">
-                      <div className="meal-header">
-                        <div>
-                          <h3>{meal.title}</h3>
-                        </div>
-                        <div className="meal-actions">
-                          <button type="button" className="ghost" onClick={() => startEdit(meal)}>
-                            Rediger
-                          </button>
-                          <button type="button" className="ghost" onClick={() => toggleDetails(meal.id)}>
-                            {isOpen ? 'Skjul detaljer' : 'Vis detaljer'}
-                          </button>
-                          <button
-                            type="button"
-                            className="ghost"
-                            onClick={() => deleteMeal(meal.id)}
-                          >
-                            Fjern
-                          </button>
-                        </div>
-                      </div>
-                      {isOpen && (
-                        <>
-                          {ingredients.length > 0 && (
-                            <ul className="ingredients">
-                              {ingredients.map((item, index) => (
-                                <li key={index}>{item}</li>
-                              ))}
-                            </ul>
-                          )}
-                          {meal.steps && (
-                            <ol className="steps">
-                              {meal.steps
-                                .split('\n')
-                                .map((step) => step.trim())
-                                .filter(Boolean)
-                                .map((step, index) => (
-                                  <li key={index}>{step}</li>
-                                ))}
-                            </ol>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          )}
-        </section>
-      </div>
+      {activeTab === 'ukeplan' && (
+        <UkeplanTab
+          meals={meals}
+          currentPlan={currentPlan}
+          currentWeekStart={currentWeekStart}
+          planHasEntries={planHasEntries}
+          dayInputs={dayInputs}
+          onDayInputChange={handleDayInputChange}
+          onAddMealToDay={addMealToDay}
+          onRemoveFromPlan={removeFromPlan}
+          onNavigateWeek={navigateWeek}
+          onWeekChange={handleWeekChange}
+          onDownloadIcs={handleDownloadIcs}
+          dateForOffset={dateForOffset}
+        />
+      )}
 
-      <section className="card">
-        <div className="section-header">
-          <div>
-            <p className="eyebrow">Ukeplan</p>
-            <h2>Legg til rett via autosøk</h2>
-          </div>
-          <p className="hint">
-            Velg uke og skriv for å finne rettene dine. Flere retter per dag er lov.
-          </p>
-        </div>
-        <div className="week-grid">
-          {DAYS.map((day, offset) => (
-            <div
-              className={`day-card ${currentPlan[day].length ? 'has-items' : ''}`}
-              key={day}
-            >
-              <div className="day-head">
-                <div>
-                  <p className="eyebrow">{day}</p>
-                  <strong>
-                    {dateForOffset(offset).toLocaleDateString('no-NO', {
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </strong>
-                </div>
-              </div>
-              <label className="field">
-                <span>Søk etter rett</span>
-                <input
-                  value={dayInputs[day]}
-                  onChange={(event) =>
-                    setDayInputs((prev) => ({ ...prev, [day]: event.target.value }))
-                  }
-                  placeholder="Skriv for å søke"
-                />
-              </label>
-              {renderSuggestions(day)}
-              {currentPlan[day].length === 0 ? (
-                <p className="empty">Ingen måltider planlagt.</p>
-              ) : (
-                <ul className="plan-list">
-                  {currentPlan[day].map((mealId, index) => {
-                    const meal = meals.find((entry) => entry.id === mealId)
-                    return (
-                      <li key={`${mealId}-${index}`}>
-                        <div>
-                          <p className="plan-title">{meal?.title ?? 'Slettet rett'}</p>
-                          {meal?.ingredients && (
-                            <p className="hint small">
-                              {meal.ingredients.split('\n').filter(Boolean).slice(0, 2).join(' • ')}
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          className="ghost"
-                          onClick={() => removeFromPlan(day, index)}
-                        >
-                          Fjern
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
+      {activeTab === 'retter' && (
+        <RetterTab
+          meals={meals}
+          filteredMeals={filteredMeals}
+          mealFilter={mealFilter}
+          onMealFilterChange={setMealFilter}
+          formState={formState}
+          onFormChange={handleFormChange}
+          onSubmit={onSubmit}
+          editingMealId={editingMealId}
+          onStartEdit={startEdit}
+          onCancelEdit={cancelEdit}
+          onDeleteMeal={deleteMeal}
+          openDetails={openDetails}
+          onToggleDetails={toggleDetails}
+        />
+      )}
 
-      <section className="card">
-        <div className="section-header">
-          <div>
-            <p className="eyebrow">Historikk</p>
-            <h2>Tidligere uker</h2>
-          </div>
-          <p className="hint">Velg en uke fra historikken for å se eller redigere.</p>
-        </div>
-        {weekList.length === 0 ? (
-          <p className="empty">Ingen uker lagret ennå.</p>
-        ) : (
-          <div className="history-grid">
-            {weekList.map((week) => {
-              const plannedCount = DAYS.reduce(
-                (acc, day) => acc + (weeklyPlans[week]?.[day]?.length ?? 0),
-                0,
-              )
-              return (
-                <button
-                  key={week}
-                  className={`history-card ${week === currentWeekStart ? 'active' : ''}`}
-                  onClick={() => handleWeekChange(week)}
-                >
-                  <div>
-                    <p className="hint small">Uke som starter</p>
-                    <strong>{new Date(week).toLocaleDateString('no-NO')}</strong>
-                  </div>
-                  <p className="hint small">{plannedCount} planlagte retter</p>
-                </button>
-              )
-            })}
-          </div>
-        )}
-      </section>
-
-      <section className="card">
-        <div className="section-header">
-          <div>
-            <p className="eyebrow">Statistikk</p>
-            <h2>Hyppighet</h2>
-          </div>
-          <p className="hint">Oppsummerer alle lagrede uker.</p>
-        </div>
-        {stats.length === 0 ? (
-          <p className="empty">Ingen statistikk ennå. Legg til retter i flere uker.</p>
-        ) : (
-          <ul className="stats-list">
-            {stats.map(({ meal, count }) => (
-              <li key={meal!.id}>
-                <div>
-                  <p className="plan-title">{meal!.title}</p>
-                  <p className="hint small">Valgt {count} ganger</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {activeTab === 'historikk' && (
+        <HistorikkTab
+          weekList={weekList}
+          weeklyPlans={weeklyPlans}
+          currentWeekStart={currentWeekStart}
+          stats={stats}
+          onWeekChange={handleWeekChange}
+        />
+      )}
     </div>
     </>
   )
