@@ -31,6 +31,7 @@ import { auth, isFirebaseConfigured } from './firebase'
 import { TabBar, type TabId } from './components/TabBar'
 import { UkeplanTab } from './components/UkeplanTab'
 import { RetterTab } from './components/RetterTab'
+import { FellesskapTab } from './components/FellesskapTab'
 import { HistorikkTab } from './components/HistorikkTab'
 
 const DAYS: Day[] = [
@@ -753,6 +754,11 @@ function App() {
           onToggleDetails={toggleDetails}
           currentPlan={currentPlan}
           onAddMealToDay={addMealToDay}
+        />
+      )}
+
+      {activeTab === 'fellesskap' && (
+        <FellesskapTab
           sharedMeals={filteredSharedMeals}
           sharedMealFilter={sharedMealFilter}
           onSharedMealFilterChange={setSharedMealFilter}
