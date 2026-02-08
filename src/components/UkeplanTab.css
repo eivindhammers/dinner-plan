@@ -1,0 +1,71 @@
+.week-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px 20px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
+  border: 1px solid #e5e7eb;
+}
+
+.week-switcher {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (min-width: 769px) {
+  .week-controls {
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .week-controls .field {
+    width: auto;
+    min-width: 180px;
+  }
+
+  .week-switcher {
+    width: auto;
+  }
+
+  .week-controls .primary {
+    width: auto;
+    white-space: nowrap;
+  }
+
+  .week-controls .hint {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .week-controls {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  .week-controls .field,
+  .week-controls .field input,
+  .week-controls .primary,
+  .week-controls .week-switcher button {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .week-controls .field input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .week-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
