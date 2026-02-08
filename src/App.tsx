@@ -706,7 +706,7 @@ function App() {
       <div className="app-shell">
       <header className="app-header">
         <div className="app-header-row">
-          <h1>Middagsplanlegger</h1>
+          <h1>Middagsplan</h1>
           {user && (
             <div className="user-info">
               <span className="household-name">{householdName || user.email}</span>
