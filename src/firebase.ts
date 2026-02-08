@@ -1,5 +1,6 @@
-import { initializeApp } from 'firebase/app'
-import { getFirestore } from 'firebase/firestore'
+import { type FirebaseApp, initializeApp } from 'firebase/app'
+import { type Firestore, getFirestore } from 'firebase/firestore'
+import { type Auth, getAuth } from 'firebase/auth'
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -10,13 +11,7 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 }
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig)
-
-// Initialize Firestore
-export const db = getFirestore(app)
-
-// Check if Firebase is configured
+// Check if Firebase is configured (before attempting init)
 export const isFirebaseConfigured = (): boolean => {
   return !!(
     firebaseConfig.apiKey &&
@@ -24,3 +19,20 @@ export const isFirebaseConfigured = (): boolean => {
     firebaseConfig.appId
   )
 }
+
+// Initialize Firebase only if configured — prevents module-level crash
+let app: FirebaseApp | null = null
+let db: Firestore | null = null
+let auth: Auth | null = null
+
+if (isFirebaseConfigured()) {
+  try {
+    app = initializeApp(firebaseConfig)
+    db = getFirestore(app)
+    auth = getAuth(app)
+  } catch (error) {
+    console.error('Firebase initialization failed:', error)
+  }
+}
+
+export { db, auth }
