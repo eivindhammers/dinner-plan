@@ -22,7 +22,7 @@ import {
   updateWeeklyPlanInFirestore,
   migrateToFirestore,
   checkFirestoreHasData,
-  checkLegacyFirestoreData,
+  migrateLegacyMealsToShared,
   createUserProfile,
   getUserProfile,
   subscribeToSharedMeals,
@@ -98,7 +98,6 @@ const LEGACY_PLAN_KEY = 'dinner-plan:weekly-plan'
 const LEGACY_WEEK_START_KEY = 'dinner-plan:week-start'
 const WEEKLY_PLANS_KEY = 'dinner-plan:weekly-plans'
 const MIGRATION_DONE_KEY = 'dinner-plan:migration-done'
-const LEGACY_MIGRATION_DONE_KEY = 'dinner-plan:legacy-migration-done'
 
 const pad = (n: number) => n.toString().padStart(2, '0')
 const formatDate = (date: Date) =>
@@ -371,26 +370,18 @@ function App() {
     return () => unsubscribe()
   }, [user])
 
-  // Check if migration is needed
+  // Migrate legacy top-level meals to shared library (one-time, tracked in Firestore)
+  useEffect(() => {
+    if (!user) return
+    migrateLegacyMealsToShared(user.uid, householdName || 'Ukjent')
+  }, [user, householdName])
+
+  // Check if localStorage → Firestore migration is needed
   useEffect(() => {
     if (!user) return
 
     const checkMigration = async () => {
       try {
-        // Check for legacy top-level Firestore data migration
-        const legacyMigrationDone = localStorage.getItem(LEGACY_MIGRATION_DONE_KEY) === 'true'
-        if (!legacyMigrationDone) {
-          try {
-            const legacyData = await checkLegacyFirestoreData()
-            if (legacyData.meals.length > 0 || Object.keys(legacyData.weeklyPlans).length > 0) {
-              await migrateToFirestore(user.uid, legacyData.meals, legacyData.weeklyPlans)
-            }
-          } catch (error) {
-            console.error('Error migrating legacy data:', error)
-          }
-          localStorage.setItem(LEGACY_MIGRATION_DONE_KEY, 'true')
-        }
-
         const migrationDone = localStorage.getItem(MIGRATION_DONE_KEY) === 'true'
         const hasFirestoreData = await checkFirestoreHasData(user.uid)
 
@@ -416,27 +407,11 @@ function App() {
   useEffect(() => {
     if (!useFirestore || !user) return
 
-    let hasInitialized = false
-
     const unsubscribe = subscribeToMeals(
       user.uid,
-      async (firestoreMeals) => {
-        if (firestoreMeals.length > 0) {
-          setMeals(firestoreMeals)
-          setIsLoading(false)
-        } else if (!hasInitialized) {
-          hasInitialized = true
-          setMeals(DEFAULT_MEALS)
-          setIsLoading(false)
-
-          try {
-            for (const meal of DEFAULT_MEALS) {
-              await addMealToFirestore(user.uid, meal)
-            }
-          } catch (error) {
-            console.error('Error adding default meals:', error)
-          }
-        }
+      (firestoreMeals) => {
+        setMeals(firestoreMeals)
+        setIsLoading(false)
       },
       (error) => {
         console.error('Firestore meals error:', error)

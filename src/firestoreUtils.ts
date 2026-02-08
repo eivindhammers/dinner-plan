@@ -285,29 +285,41 @@ export const checkFirestoreHasData = async (uid: string): Promise<boolean> => {
   }
 }
 
-// Check if old top-level meals collection has data (for migration from shared to per-user)
-export const checkLegacyFirestoreData = async (): Promise<{
-  meals: Meal[]
-  weeklyPlans: WeeklyPlans
-}> => {
-  if (!db) return { meals: [], weeklyPlans: {} }
+// Migrate legacy top-level meals to the shared meals collection (one-time, tracked via Firestore flag)
+export const migrateLegacyMealsToShared = async (
+  uid: string,
+  householdName: string,
+): Promise<void> => {
+  if (!db) return
 
   try {
-    const mealsSnapshot = await getDocs(collection(db, 'meals'))
-    const meals: Meal[] = []
-    mealsSnapshot.forEach((doc) => {
-      meals.push({ id: doc.id, ...doc.data() } as Meal)
-    })
+    const flagRef = doc(db, 'config', 'legacyMigration')
+    const flagSnap = await getDoc(flagRef)
+    if (flagSnap.exists()) return
 
-    const plansSnapshot = await getDocs(collection(db, 'weeklyPlans'))
-    const weeklyPlans: WeeklyPlans = {}
-    plansSnapshot.forEach((doc) => {
-      weeklyPlans[doc.id] = doc.data() as WeekPlan
-    })
+    const legacyMeals = await getDocs(collection(db, 'meals'))
+    if (legacyMeals.empty) {
+      await setDoc(flagRef, { done: true, migratedAt: serverTimestamp() })
+      return
+    }
 
-    return { meals, weeklyPlans }
+    const batch = writeBatch(db)
+    legacyMeals.forEach((docSnap) => {
+      const data = docSnap.data()
+      const sharedRef = doc(db!, 'sharedMeals', makeId())
+      batch.set(sharedRef, {
+        title: data.title,
+        ingredients: data.ingredients,
+        imageUrl: data.imageUrl ?? null,
+        steps: data.steps ?? null,
+        addedBy: uid,
+        addedByHousehold: householdName,
+        addedAt: serverTimestamp(),
+      })
+    })
+    batch.set(flagRef, { done: true, migratedAt: serverTimestamp() })
+    await batch.commit()
   } catch (error) {
-    console.error('Error checking legacy Firestore data:', error)
-    return { meals: [], weeklyPlans: {} }
+    console.error('Error migrating legacy meals to shared:', error)
   }
 }
