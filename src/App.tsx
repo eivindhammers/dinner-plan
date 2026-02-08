@@ -7,7 +7,6 @@ import {
   type User,
 } from 'firebase/auth'
 import './App.css'
-import { MigrationModal } from './MigrationModal'
 import {
   type Meal,
   type Day,
@@ -20,8 +19,6 @@ import {
   updateMealInFirestore,
   deleteMealFromFirestore,
   updateWeeklyPlanInFirestore,
-  migrateToFirestore,
-  checkFirestoreHasData,
   migrateLegacyMealsToShared,
   createUserProfile,
   getUserProfile,
@@ -46,58 +43,7 @@ const DAYS: Day[] = [
   'Søndag',
 ]
 
-const DEFAULT_MEALS: Meal[] = [
-  {
-    id: 'seed-curry-laks',
-    title: 'Superrask rød curry med laks',
-    ingredients: [
-      '400 g laksefilet i terninger',
-      '1 rød paprika i strimler',
-      '1 bunt vårløk i skiver',
-      '100 g sukkererter i staver',
-      '2 ss rød currypaste',
-      '1 boks kokosmelk (4 dl)',
-      '1 terning fiskebuljong',
-      '1 ss olje til steking',
-      'Limebåter og frisk koriander til servering',
-      'Kokt ris eller nudler som tilbehør',
-    ].join('\n'),
-    imageUrl: 'https://www.godfisk.no/globalassets/3iuka/godfisk/laks/rod-curry-laks.jpg',
-    steps: [
-      'Skjær laksen i terninger.',
-      'Strimle vårløk og skjær paprika og sukkererter i staver.',
-      'Varm olje i en gryte og fres rød currypaste kort.',
-      'Tilsett kokosmelk og fiskebuljong, kok opp.',
-      'Ha i fisk og grønnsaker og la trekke til fisken er ferdig (ca. 5 min).',
-      'Server med ris eller nudler, lime og koriander.',
-    ].join('\n'),
-  },
-  {
-    id: 'seed-pannekaker',
-    title: 'Pannekaker',
-    ingredients: [
-      '3 dl hvetemel',
-      '0,5 ts salt',
-      '5 dl melk',
-      '4 egg',
-      '1 ss smør eller margarin til røren',
-    ].join('\n'),
-    imageUrl: 'https://images.matprat.no/mvgzxlprh3-normal/710/pannekakerøre.jpg.png',
-    steps: [
-      'Bland mel og salt i en stor bolle.',
-      'Visp inn halvparten av melken til en klumpfri røre, rør inn resten av melken.',
-      'Visp inn eggene og la røren svelle i ca. 30 minutter.',
-      'Smelt smør i en varm stekepanne og stek tynne pannekaker, snu når oversiden har satt seg.',
-      'Legg pannekakene i et fat med lokk for å holde dem varme til servering.',
-    ].join('\n'),
-  },
-]
-
-const MEAL_STORAGE_KEY = 'dinner-plan:meals'
-const LEGACY_PLAN_KEY = 'dinner-plan:weekly-plan'
 const LEGACY_WEEK_START_KEY = 'dinner-plan:week-start'
-const WEEKLY_PLANS_KEY = 'dinner-plan:weekly-plans'
-const MIGRATION_DONE_KEY = 'dinner-plan:migration-done'
 
 const pad = (n: number) => n.toString().padStart(2, '0')
 const formatDate = (date: Date) =>
@@ -139,68 +85,6 @@ const getUpcomingMonday = () => {
   monday.setHours(0, 0, 0, 0)
   monday.setDate(now.getDate() + diff)
   return monday.toISOString().split('T')[0]
-}
-
-const ensurePlanShape = (plan?: Partial<Record<Day, string[]>>): WeekPlan => {
-  const base = emptyPlan()
-  if (!plan) return base
-  DAYS.forEach((day) => {
-    base[day] = Array.isArray(plan[day]) ? plan[day]! : []
-  })
-  return base
-}
-
-const loadMeals = (): Meal[] => {
-  if (typeof window === 'undefined') return []
-  const raw = localStorage.getItem(MEAL_STORAGE_KEY)
-  if (!raw) return DEFAULT_MEALS
-  try {
-    const parsed = JSON.parse(raw)
-    if (Array.isArray(parsed)) return parsed.length === 0 ? DEFAULT_MEALS : parsed
-    return DEFAULT_MEALS
-  } catch {
-    return DEFAULT_MEALS
-  }
-}
-
-const loadWeeklyPlans = (): WeeklyPlans => {
-  if (typeof window === 'undefined') return {}
-  const plansRaw = localStorage.getItem(WEEKLY_PLANS_KEY)
-  const result: WeeklyPlans = {}
-
-  if (plansRaw) {
-    try {
-      const parsed = JSON.parse(plansRaw) as Record<string, Partial<Record<Day, string[]>>>
-      Object.entries(parsed).forEach(([week, plan]) => {
-        const monday = toMonday(week)
-        result[monday] = ensurePlanShape(plan)
-      })
-    } catch {
-      // ignore broken data
-    }
-  }
-
-  const legacyPlanRaw = localStorage.getItem(LEGACY_PLAN_KEY)
-  if (legacyPlanRaw) {
-    const weekStart = localStorage.getItem(LEGACY_WEEK_START_KEY) ?? getUpcomingMonday()
-    try {
-      const legacyPlan = JSON.parse(legacyPlanRaw) as Partial<Record<Day, string[]>>
-      result[toMonday(weekStart)] = ensurePlanShape(legacyPlan)
-    } catch {
-      // ignore
-    }
-  }
-
-  return result
-}
-
-const loadInitialWeekStart = (existingPlans: WeeklyPlans) => {
-  const stored = typeof window !== 'undefined' ? localStorage.getItem(LEGACY_WEEK_START_KEY) : null
-  const weeks = Object.keys(existingPlans)
-  if (stored && existingPlans[toMonday(stored)]) return toMonday(stored)
-  if (stored) return toMonday(stored)
-  if (weeks.length > 0) return weeks.sort()[weeks.length - 1]
-  return getUpcomingMonday()
 }
 
 const escapeText = (text: string) =>
@@ -277,8 +161,6 @@ const buildIcsFile = (plan: WeekPlan, meals: Meal[], weekStartDate: string) => {
   return lines.join('\r\n')
 }
 
-const initialPlans = loadWeeklyPlans()
-
 function App() {
   // Firebase Auth state
   const [user, setUser] = useState<User | null>(null)
@@ -296,11 +178,9 @@ function App() {
   const [sharedOpenDetails, setSharedOpenDetails] = useState<Record<string, boolean>>({})
 
   // App state
-  const [meals, setMeals] = useState<Meal[]>(loadMeals)
-  const [weeklyPlans, setWeeklyPlans] = useState<WeeklyPlans>(initialPlans)
-  const [currentWeekStart, setCurrentWeekStart] = useState<string>(() =>
-    loadInitialWeekStart(initialPlans),
-  )
+  const [meals, setMeals] = useState<Meal[]>([])
+  const [weeklyPlans, setWeeklyPlans] = useState<WeeklyPlans>({})
+  const [currentWeekStart, setCurrentWeekStart] = useState<string>(getUpcomingMonday)
   const [formState, setFormState] = useState({
     title: '',
     ingredients: '',
@@ -320,10 +200,8 @@ function App() {
         {} as Record<Day, string>,
       ),
   )
-  const [showMigrationModal, setShowMigrationModal] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [firestoreError, setFirestoreError] = useState<string | null>(null)
-  const [useFirestore, setUseFirestore] = useState(isFirebaseConfigured())
   const [creatingWeeks, setCreatingWeeks] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<TabId>('ukeplan')
 
@@ -332,7 +210,6 @@ function App() {
     if (!isFirebaseConfigured() || !auth) {
       setAuthLoading(false)
       setIsLoading(false)
-      setUseFirestore(false)
       return
     }
 
@@ -376,36 +253,9 @@ function App() {
     migrateLegacyMealsToShared(user.uid, householdName || 'Ukjent')
   }, [user, householdName])
 
-  // Check if localStorage → Firestore migration is needed
-  useEffect(() => {
-    if (!user) return
-
-    const checkMigration = async () => {
-      try {
-        const migrationDone = localStorage.getItem(MIGRATION_DONE_KEY) === 'true'
-        const hasFirestoreData = await checkFirestoreHasData(user.uid)
-
-        const localMeals = loadMeals()
-        const localPlans = loadWeeklyPlans()
-        const hasLocalData =
-          localMeals.length > 0 || Object.keys(localPlans).length > 0
-
-        if (!migrationDone && !hasFirestoreData && hasLocalData) {
-          setShowMigrationModal(true)
-        }
-      } catch (error) {
-        console.error('Error during migration check:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    checkMigration()
-  }, [user])
-
   // Subscribe to Firestore meals
   useEffect(() => {
-    if (!useFirestore || !user) return
+    if (!user) return
 
     const unsubscribe = subscribeToMeals(
       user.uid,
@@ -421,11 +271,11 @@ function App() {
     )
 
     return () => unsubscribe()
-  }, [useFirestore, user])
+  }, [user])
 
   // Subscribe to Firestore weekly plans
   useEffect(() => {
-    if (!useFirestore || !user) return
+    if (!user) return
 
     const unsubscribe = subscribeToWeeklyPlans(
       user.uid,
@@ -439,18 +289,7 @@ function App() {
     )
 
     return () => unsubscribe()
-  }, [useFirestore, user])
-
-  // Fallback to localStorage if not using Firestore
-  useEffect(() => {
-    if (useFirestore) return
-    localStorage.setItem(MEAL_STORAGE_KEY, JSON.stringify(meals))
-  }, [meals, useFirestore])
-
-  useEffect(() => {
-    if (useFirestore) return
-    localStorage.setItem(WEEKLY_PLANS_KEY, JSON.stringify(weeklyPlans))
-  }, [weeklyPlans, useFirestore])
+  }, [user])
 
   useEffect(() => {
     localStorage.setItem(LEGACY_WEEK_START_KEY, currentWeekStart)
@@ -524,22 +363,6 @@ function App() {
     }
   }
 
-  const handleMigration = async (
-    mealsToMigrate: Meal[],
-    plansToMigrate: WeeklyPlans,
-    onProgress: (status: string) => void,
-  ) => {
-    if (!user) return
-    await migrateToFirestore(user.uid, mealsToMigrate, plansToMigrate, onProgress)
-    localStorage.setItem(MIGRATION_DONE_KEY, 'true')
-    setShowMigrationModal(false)
-  }
-
-  const dismissMigrationModal = () => {
-    localStorage.setItem(MIGRATION_DONE_KEY, 'true')
-    setShowMigrationModal(false)
-  }
-
   const currentPlan = useMemo(
     () => weeklyPlans[currentWeekStart] ?? emptyPlan(),
     [weeklyPlans, currentWeekStart],
@@ -601,14 +424,7 @@ function App() {
     const newPlan = emptyPlan()
 
     try {
-      if (useFirestore && user) {
-        await updateWeeklyPlanInFirestore(user.uid, monday, newPlan)
-      } else {
-        setWeeklyPlans((prev) => ({
-          ...prev,
-          [monday]: newPlan,
-        }))
-      }
+      await updateWeeklyPlanInFirestore(user!.uid, monday, newPlan)
     } catch (error) {
       console.error('Error creating week:', error)
       setFirestoreError('Kunne ikke opprette uke')
@@ -634,20 +450,10 @@ function App() {
     }
 
     try {
-      if (useFirestore && user) {
-        if (editingMealId) {
-          await updateMealInFirestore(user.uid, mealData)
-        } else {
-          await addMealToFirestore(user.uid, mealData)
-        }
+      if (editingMealId) {
+        await updateMealInFirestore(user!.uid, mealData)
       } else {
-        if (editingMealId) {
-          setMeals((prev) =>
-            prev.map((meal) => (meal.id === editingMealId ? mealData : meal)),
-          )
-        } else {
-          setMeals((prev) => [...prev, mealData])
-        }
+        await addMealToFirestore(user!.uid, mealData)
       }
 
       setEditingMealId(null)
@@ -676,34 +482,19 @@ function App() {
 
   const deleteMeal = async (id: string) => {
     try {
-      if (useFirestore && user) {
-        await deleteMealFromFirestore(user.uid, id)
-        const updatedPlans: WeeklyPlans = {}
-        Object.entries(weeklyPlans).forEach(([week, plan]) => {
-          const updated = emptyPlan()
-          DAYS.forEach((day) => {
-            updated[day] = plan[day].filter((mealId) => mealId !== id)
-          })
-          updatedPlans[week] = updated
+      await deleteMealFromFirestore(user!.uid, id)
+      const updatedPlans: WeeklyPlans = {}
+      Object.entries(weeklyPlans).forEach(([week, plan]) => {
+        const updated = emptyPlan()
+        DAYS.forEach((day) => {
+          updated[day] = plan[day].filter((mealId) => mealId !== id)
         })
-        for (const [week, plan] of Object.entries(updatedPlans)) {
-          if (JSON.stringify(plan) !== JSON.stringify(weeklyPlans[week])) {
-            await updateWeeklyPlanInFirestore(user.uid, week, plan)
-          }
+        updatedPlans[week] = updated
+      })
+      for (const [week, plan] of Object.entries(updatedPlans)) {
+        if (JSON.stringify(plan) !== JSON.stringify(weeklyPlans[week])) {
+          await updateWeeklyPlanInFirestore(user!.uid, week, plan)
         }
-      } else {
-        setMeals((prev) => prev.filter((meal) => meal.id !== id))
-        setWeeklyPlans((prev) => {
-          const next: WeeklyPlans = {}
-          Object.entries(prev).forEach(([week, plan]) => {
-            const updated = emptyPlan()
-            DAYS.forEach((day) => {
-              updated[day] = plan[day].filter((mealId) => mealId !== id)
-            })
-            next[week] = updated
-          })
-          return next
-        })
       }
     } catch (error) {
       console.error('Error deleting meal:', error)
@@ -720,14 +511,7 @@ function App() {
     }
 
     try {
-      if (useFirestore && user) {
-        await updateWeeklyPlanInFirestore(user.uid, currentWeekStart, newPlan)
-      } else {
-        setWeeklyPlans((prev) => ({
-          ...prev,
-          [currentWeekStart]: newPlan,
-        }))
-      }
+      await updateWeeklyPlanInFirestore(user!.uid, currentWeekStart, newPlan)
       setDayInputs((prev) => ({ ...prev, [day]: '' }))
     } catch (error) {
       console.error('Error adding meal to day:', error)
@@ -751,14 +535,7 @@ function App() {
     }
 
     try {
-      if (useFirestore && user) {
-        await updateWeeklyPlanInFirestore(user.uid, currentWeekStart, newPlan)
-      } else {
-        setWeeklyPlans((prev) => ({
-          ...prev,
-          [currentWeekStart]: newPlan,
-        }))
-      }
+      await updateWeeklyPlanInFirestore(user!.uid, currentWeekStart, newPlan)
     } catch (error) {
       console.error('Error removing meal from plan:', error)
       setFirestoreError('Kunne ikke fjerne rett fra planen')
@@ -916,14 +693,6 @@ function App() {
 
   return (
     <>
-      {showMigrationModal && (
-        <MigrationModal
-          meals={loadMeals()}
-          weeklyPlans={loadWeeklyPlans()}
-          onMigrate={handleMigration}
-          onDismiss={dismissMigrationModal}
-        />
-      )}
       {firestoreError && (
         <div className="modal-overlay">
           <div className="modal-card">
