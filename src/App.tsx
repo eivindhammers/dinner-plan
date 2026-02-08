@@ -751,6 +751,8 @@ function App() {
           onDeleteMeal={deleteMeal}
           openDetails={openDetails}
           onToggleDetails={toggleDetails}
+          currentPlan={currentPlan}
+          onAddMealToDay={addMealToDay}
           sharedMeals={filteredSharedMeals}
           sharedMealFilter={sharedMealFilter}
           onSharedMealFilterChange={setSharedMealFilter}
