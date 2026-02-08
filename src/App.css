@@ -20,6 +20,35 @@
   font-size: 20px;
 }
 
+.app-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.household-name {
+  font-size: 14px;
+  color: #9ca3af;
+}
+
+.header-logout {
+  padding: 6px 12px;
+  font-size: 13px;
+  color: #d1d5db;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.header-logout:hover:enabled {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .auth-shell {
   min-height: 100vh;
   display: flex;
@@ -40,6 +69,31 @@
 
 .auth-card h1 {
   margin: 0 0 8px;
+}
+
+.auth-toggle {
+  margin: 16px 0 0;
+  text-align: center;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: #2563eb;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  box-shadow: none;
+}
+
+.link-button:hover:enabled {
+  transform: none;
+  box-shadow: none;
+  color: #1d4ed8;
 }
 
 .error {

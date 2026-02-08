@@ -20,6 +20,16 @@
     grid-template-columns: 1fr;
     max-height: 70vh;
   }
+
+  .retter-shared {
+    grid-column: 1 / -1;
+  }
+}
+
+.shared-by {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 2px 0 0;
 }
 
 @media (max-width: 768px) {

@@ -1,0 +1,34 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // User profiles — only the owner can read/write
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Per-household meals
+      match /meals/{mealId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Per-household weekly plans
+      match /weeklyPlans/{weekStart} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Shared meals — any authenticated user can read and write
+    match /sharedMeals/{mealId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Legacy top-level collections (read-only for migration)
+    match /meals/{mealId} {
+      allow read: if request.auth != null;
+    }
+
+    match /weeklyPlans/{weekStart} {
+      allow read: if request.auth != null;
+    }
+  }
+}
