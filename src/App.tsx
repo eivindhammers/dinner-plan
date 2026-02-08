@@ -343,16 +343,6 @@ function App() {
     if (auth) await signOut(auth)
   }
 
-  const handleShareMeal = async (meal: Meal) => {
-    if (!user) return
-    try {
-      await shareMealToGlobal(meal, user.uid, householdName || 'Ukjent')
-    } catch (error) {
-      console.error('Error sharing meal:', error)
-      setFirestoreError('Kunne ikke dele rett')
-    }
-  }
-
   const handleImportSharedMeal = async (sharedMeal: SharedMeal) => {
     if (!user) return
     try {
@@ -454,6 +444,8 @@ function App() {
         await updateMealInFirestore(user!.uid, mealData)
       } else {
         await addMealToFirestore(user!.uid, mealData)
+        // Auto-share new meals to the shared library
+        await shareMealToGlobal(mealData, user!.uid, householdName || 'Ukjent')
       }
 
       setEditingMealId(null)
@@ -759,7 +751,6 @@ function App() {
           onDeleteMeal={deleteMeal}
           openDetails={openDetails}
           onToggleDetails={toggleDetails}
-          onShareMeal={user ? handleShareMeal : undefined}
           sharedMeals={filteredSharedMeals}
           sharedMealFilter={sharedMealFilter}
           onSharedMealFilterChange={setSharedMealFilter}

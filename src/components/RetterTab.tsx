@@ -16,7 +16,6 @@ interface RetterTabProps {
   onDeleteMeal: (id: string) => void
   openDetails: Record<string, boolean>
   onToggleDetails: (id: string) => void
-  onShareMeal?: (meal: Meal) => void
   sharedMeals: SharedMeal[]
   sharedMealFilter: string
   onSharedMealFilterChange: (value: string) => void
@@ -40,7 +39,6 @@ export function RetterTab({
   onDeleteMeal,
   openDetails,
   onToggleDetails,
-  onShareMeal,
   sharedMeals,
   sharedMealFilter,
   onSharedMealFilterChange,
@@ -163,11 +161,6 @@ export function RetterTab({
                         <button type="button" className="ghost" onClick={() => onStartEdit(meal)}>
                           Rediger
                         </button>
-                        {onShareMeal && (
-                          <button type="button" className="ghost" onClick={() => onShareMeal(meal)}>
-                            Del
-                          </button>
-                        )}
                         <button type="button" className="ghost" onClick={() => onToggleDetails(meal.id)}>
                           {isOpen ? 'Skjul detaljer' : 'Vis detaljer'}
                         </button>
@@ -210,8 +203,7 @@ export function RetterTab({
         )}
       </section>
 
-      {(totalSharedMeals > 0 || sharedMeals.length > 0) && (
-        <section className="card retter-shared">
+      <section className="card retter-shared">
           <div className="section-header">
             <div>
               <p className="eyebrow">Fellesskap</p>
@@ -297,7 +289,6 @@ export function RetterTab({
             })}
           </div>
         </section>
-      )}
     </div>
   )
 }
