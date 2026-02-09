@@ -217,6 +217,12 @@ export const shareMealToGlobal = async (
   })
 }
 
+export const deleteSharedMeal = async (id: string): Promise<void> => {
+  if (!db) throw new Error('Firebase not configured')
+  const sharedRef = doc(db, 'sharedMeals', id)
+  await deleteDoc(sharedRef)
+}
+
 export const importSharedMeal = async (
   uid: string,
   sharedMeal: SharedMeal,

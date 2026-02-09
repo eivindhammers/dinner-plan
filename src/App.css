@@ -199,6 +199,12 @@ button:disabled {
   border: 1px solid #e5e7eb;
 }
 
+.danger {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+}
+
 .eyebrow {
   letter-spacing: 0.08em;
   text-transform: uppercase;

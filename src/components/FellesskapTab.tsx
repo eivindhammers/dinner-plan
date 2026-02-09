@@ -9,6 +9,8 @@ interface FellesskapTabProps {
   onToggleSharedDetails: (id: string) => void
   onImportSharedMeal: (meal: SharedMeal) => void
   totalSharedMeals: number
+  isAdmin: boolean
+  onDeleteSharedMeal: (id: string) => void
 }
 
 export function FellesskapTab({
@@ -19,6 +21,8 @@ export function FellesskapTab({
   onToggleSharedDetails,
   onImportSharedMeal,
   totalSharedMeals,
+  isAdmin,
+  onDeleteSharedMeal,
 }: FellesskapTabProps) {
   return (
     <section className="card fellesskap-section">
@@ -80,6 +84,15 @@ export function FellesskapTab({
                       >
                         Legg til
                       </button>
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          className="danger"
+                          onClick={() => onDeleteSharedMeal(meal.id)}
+                        >
+                          Fjern
+                        </button>
+                      )}
                     </div>
                   </div>
                   {isOpen && (
