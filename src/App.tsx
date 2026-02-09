@@ -25,6 +25,7 @@ import {
   subscribeToSharedMeals,
   shareMealToGlobal,
   importSharedMeal,
+  deleteSharedMeal,
   makeId,
 } from './firestoreUtils'
 import { auth, isFirebaseConfigured } from './firebase'
@@ -342,6 +343,17 @@ function App() {
 
   const handleLogout = async () => {
     if (auth) await signOut(auth)
+  }
+
+  const isAdmin = user?.uid === import.meta.env.VITE_ADMIN_UID
+
+  const handleDeleteSharedMeal = async (id: string) => {
+    try {
+      await deleteSharedMeal(id)
+    } catch (error) {
+      console.error('Error deleting shared meal:', error)
+      setFirestoreError('Kunne ikke slette delt rett')
+    }
   }
 
   const handleImportSharedMeal = async (sharedMeal: SharedMeal) => {
@@ -766,6 +778,8 @@ function App() {
           onToggleSharedDetails={toggleSharedDetails}
           onImportSharedMeal={handleImportSharedMeal}
           totalSharedMeals={sharedMeals.length}
+          isAdmin={isAdmin}
+          onDeleteSharedMeal={handleDeleteSharedMeal}
         />
       )}
 
