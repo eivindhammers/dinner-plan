@@ -85,7 +85,7 @@ const getUpcomingMonday = () => {
   const monday = new Date(now)
   monday.setHours(0, 0, 0, 0)
   monday.setDate(now.getDate() + diff)
-  return monday.toISOString().split('T')[0]
+  return formatDate(monday)
 }
 
 const escapeText = (text: string) =>
@@ -561,9 +561,9 @@ function App() {
   }
 
   const navigateWeek = (direction: 1 | -1) => {
-    const base = currentWeekStart ? new Date(currentWeekStart) : new Date()
+    const base = currentWeekStart ? parseDate(currentWeekStart) : new Date()
     base.setDate(base.getDate() + direction * 7)
-    const nextWeek = toMonday(base.toISOString().split('T')[0])
+    const nextWeek = toMonday(formatDate(base))
     ensureWeekExists(nextWeek)
     setCurrentWeekStart(nextWeek)
   }
