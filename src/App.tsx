@@ -85,7 +85,7 @@ const getUpcomingMonday = () => {
   const monday = new Date(now)
   monday.setHours(0, 0, 0, 0)
   monday.setDate(now.getDate() + diff)
-  return monday.toISOString().split('T')[0]
+  return formatDate(monday)
 }
 
 const escapeText = (text: string) =>
@@ -95,12 +95,17 @@ const escapeText = (text: string) =>
     .replace(/,/g, '\\,')
     .replace(/\n/g, '\\n')
 
-const formatDateForICS = (date: Date) => date.toISOString().slice(0, 10).replace(/-/g, '')
+const formatDateForICS = (date: Date) => {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}${m}${d}`
+}
 
 const buildIcsFile = (plan: WeekPlan, meals: Meal[], weekStartDate: string) => {
   if (!weekStartDate) return ''
-  const startDate = new Date(weekStartDate)
-  startDate.setHours(0, 0, 0, 0)
+  const [y, mo, d] = weekStartDate.split('-').map(Number)
+  const startDate = new Date(y, mo - 1, d)
 
   const lines = [
     'BEGIN:VCALENDAR',
@@ -556,9 +561,9 @@ function App() {
   }
 
   const navigateWeek = (direction: 1 | -1) => {
-    const base = currentWeekStart ? new Date(currentWeekStart) : new Date()
+    const base = currentWeekStart ? parseDate(currentWeekStart) : new Date()
     base.setDate(base.getDate() + direction * 7)
-    const nextWeek = toMonday(base.toISOString().split('T')[0])
+    const nextWeek = toMonday(formatDate(base))
     ensureWeekExists(nextWeek)
     setCurrentWeekStart(nextWeek)
   }
